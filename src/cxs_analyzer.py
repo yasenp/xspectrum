@@ -2,8 +2,11 @@ import random
 
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.fftpack import fft
-from constants import Labels
+from scipy.fftpack import fft, fftshift, fftfreq
+from scipy.signal.windows import flattop, hamming, kaiser, blackman, hann
+from constants import Labels, Windows
+
+
 
 
 class SdrSig():
@@ -17,7 +20,7 @@ class SdrSig():
         self.sample_rate = frequency_sample_rate
         self.gain = gain  # Increase or reduce this depending on the strength of the signals being studied.
 
-    def frequency_generator_relative(self, span):
+    def frequency_generator_relative(self):
         """
         Generate frequencies which are fixed relative to the configured center frequency.
         Avoids generating freq which falls into 0th fft bin.
@@ -31,7 +34,7 @@ class SdrSig():
         relative_freq_list = [f1, f2, f3]
         return relative_freq_list
 
-    def frequency_generator_absolute(self):
+    def frequency_sweep_generator_absolute(self):
         """
         Generate frequencies which are fixed in an absolute term, independent of the configured center frequency.
         It generates signals at each MHz.
@@ -63,8 +66,8 @@ class SdrSig():
         t_start = random.random()
         self.t_times = np.linspace(t_start, int(t_start + sample_time_interval), int(self.sample_rate * sample_time_interval))
         signal_time_domain = []
-        # f = np.array(self.frequency_generator_relative())
-        f = np.array(self.frequency_generator_absolute())
+        f = np.array(self.frequency_generator_relative())
+        # f = np.array(self.frequency_sweep_generator_absolute())
         print(
             "INFO:testfft_rtlsdr: freqs [{}], sampRate [{}], tStart [{}], dur [{}], len [{}]".format(
                 self.center_freq - f, self.sample_rate, t_start, sample_time_interval, len(self.t_times)))
@@ -83,36 +86,45 @@ class SdrSig():
             print("Center frequency = {0} Hz does not match requirement to be within -50Mhz to 50Mhz.".format(frequency))
             exit(1)
 
-    def test(self, signal_size, rbw, k_win, span):
-        data_buffer = self.travers_samples(random.randint(1, signal_size)*2**16)
-        fftSize = len(data_buffer)
-        win = np.kaiser(len(data_buffer), 15)
+    def employ_window_fft(self, window_function, points):
+        win = None
+        if Windows.Bartlett in window_function:
+            win = np.bartlett(points)
+        elif Windows.Kaiser in window_function:
+            win = np.kaiser(points, 15)
+        elif Windows.Hamming in window_function:
+            win = np.hamming(points)
+        elif Windows.Hanning in window_function:
+            win = np.hanning(points)
+        elif Windows.Blackman in window_function:
+            win = np.blackman(points)
+        return win
 
-        # win = np.hanning(len(data_buffer))
-        freqs = np.fft.fftshift(np.fft.fftfreq(len(data_buffer), 1 / span)) + self.center_freq
-        print("INFO:testfft_rtlsdr: freqs [{}] - [{}], fftSize [{}]".format(min(freqs), max(freqs), fftSize))
-        fftCur = np.abs(np.fft.fft(data_buffer)) / len(data_buffer)
+    def test(self, signal_size, fft_size_points, fft_win_type, span):
+        data_buffer = self.travers_samples(random.randint(1, signal_size)*2**16)
+        window = self.employ_window_fft(fft_win_type, fft_size_points)
+        freqs = np.fft.fftshift(np.fft.fftfreq(len(window),1/self.sample_rate)) + self.center_freq
+        print("INFO:testfft_rtlsdr: freqs [{}] - [{}], fftSize [{}]".format(min(freqs), max(freqs), len(data_buffer)))
+        fftCur = np.abs(np.fft.fft(data_buffer))/len(data_buffer)
         fftCur = np.fft.fftshift(fftCur)
-        fftCurWin = np.abs(np.fft.fft(data_buffer * win)) / len(data_buffer)
+        fftCurWin = np.abs(np.fft.fft(data_buffer*window))/len(data_buffer)
         fftCurWin = np.fft.fftshift(fftCurWin)
-        plt.subplot(3, 2, 1)
+        plt.subplot(2,2,1)
         plt.plot(freqs, fftCur)
-        plt.subplot(3, 2, 2)
-        plt.plot(freqs, 10 * np.log10(fftCur))
-        plt.subplot(3, 2, 3)
+        plt.subplot(2,2,2)
+        plt.plot(freqs, 10*np.log10(fftCur))
+        plt.subplot(2,2,3)
         plt.plot(freqs, fftCurWin)
-        plt.subplot(3, 2, 4)
-        plt.plot(freqs, 10 * np.log10(fftCurWin))
-        plt.subplot(3, 2, 5)
-        plt.plot(self.t_times, data_buffer)
+        plt.subplot(2,2,4)
+        plt.plot(freqs, 10*np.log10(fftCurWin))
         plt.show()
 
 
 
 
 if __name__ == '__main__':
-    sdr = SdrSig(frequency_center=5e6)
+    sdr = SdrSig(frequency_center=2e6)
     relative_freq_list = sdr.frequency_generator_relative()
-    absolute_freq_list = sdr.frequency_generator_absolute()
-    sdr.test(signal_size=10, fft_size_points=32, fft_win_type=np.hanning, span=1e6)
+    absolute_freq_list = sdr.frequency_sweep_generator_absolute()
+    sdr.test(signal_size=10, fft_size_points=1024, fft_win_type=Windows.Hanning, span=50e6)
 
