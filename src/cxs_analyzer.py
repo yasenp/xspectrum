@@ -103,7 +103,7 @@ class SdrSig():
     def test(self, signal_size, fft_size_points, fft_win_type, span):
         data_buffer = self.travers_samples(random.randint(1, signal_size)*2**16)
         window = self.employ_window_fft(fft_win_type, fft_size_points)
-        freqs = np.fft.fftshift(np.fft.fftfreq(len(window),1/self.sample_rate)) + self.center_freq
+        freqs = np.fft.fftshift(np.fft.fftfreq(len(data_buffer), 1 / span)) + self.center_freq
         print("INFO:testfft_rtlsdr: freqs [{}] - [{}], fftSize [{}]".format(min(freqs), max(freqs), len(data_buffer)))
         fftCur = np.abs(np.fft.fft(data_buffer))/len(data_buffer)
         fftCur = np.fft.fftshift(fftCur)
@@ -120,11 +120,9 @@ class SdrSig():
         plt.show()
 
 
-
-
 if __name__ == '__main__':
     sdr = SdrSig(frequency_center=2e6)
     relative_freq_list = sdr.frequency_generator_relative()
     absolute_freq_list = sdr.frequency_sweep_generator_absolute()
-    sdr.test(signal_size=10, fft_size_points=1024, fft_win_type=Windows.Hanning, span=50e6)
+    sdr.test(signal_size=2, fft_size_points=1024, fft_win_type=Windows.Hanning, span=6.5e6)
 
