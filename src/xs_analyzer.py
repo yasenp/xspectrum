@@ -10,10 +10,9 @@ from quantiphy import Quantity
 
 
 class Signal():
-    def __init__(self, sample_rate=100e6, span=100e6, center_frequency=2e6):
+    def __init__(self, sample_rate=100e6, center_frequency=2e6):
         self.center_frequency = self.check_frequency(center_frequency)
         self.sample_rate = sample_rate
-        self.span = span
         # create figure ax 1 and 2 and 3
         self.fig, [self.ax1, self.ax2, self.ax3] = plt.subplots(nrows=3, ncols=1)
         self.fig.set_figheight(8)
@@ -79,7 +78,7 @@ class Signal():
         f_plot = freq_steps[0:int(number_of_samples/2+1)]
         x_mag_plot = 2 * x_mag[0:int(number_of_samples/2+1)]
         x_mag_plot[0] = x_mag_plot[0] / 2
-        q_span = Quantity(self.span, 'Hz')
+        q_span = Quantity(span, 'Hz')
         q_rbw = Quantity(self.sample_rate/number_of_samples, 'Hz')
         self.plot_signal(f_plot, x_mag_plot, self.ax2,
                          title="Spectrum Analyzer. Span = {0} | RBW = {1}".format(q_span, q_rbw),
@@ -134,8 +133,8 @@ class Signal():
 
 
 if __name__ == '__main__':
-    sig = Signal()
-    (sig.waveform(span=100e6, fft_size=4096, window_type=Windows.Kaiser, sweep=False))
+    sig = Signal(center_frequency=2.4e6)
+    sig.waveform(span=100e6, fft_size=4096, window_type=Windows.Hamming, sweep=True)
     plt.show()
 
 
