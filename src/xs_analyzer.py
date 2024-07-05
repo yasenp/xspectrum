@@ -3,8 +3,10 @@ import random
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.fftpack import fft, fftshift, fftfreq
+from scipy.signal import chirp
 from scipy.signal.windows import flattop, hamming, kaiser, blackman, hann
 from constants import Labels, Windows
+from quantiphy import Quantity
 
 
 class Signal():
@@ -45,7 +47,7 @@ class Signal():
             win = np.blackman(points)
         return win
 
-    def sine_wave(self, span=100e6, fft_size=32, window_type=Windows.Kaiser):
+    def waveform(self, span=100e6, fft_size=32, window_type=Windows.Kaiser, sweep=False):
         start_freq = self.center_frequency - span/2
         mid_f1 = self.center_frequency - span/4
         mid_f2 = self.center_frequency + span/4
@@ -56,14 +58,18 @@ class Signal():
         freq_inteval = self.sample_rate / number_of_samples
         freq_steps = np.linspace(0, (number_of_samples - 1) * freq_inteval, number_of_samples)
 
-        #  sine waves combined
-        y = (1 * np.sin(2 * np.pi * start_freq * time_steps) +
-             8 * np.sin(2 * np.pi  * mid_f1 * time_steps) +
-             4 * np.sin(2 * np.pi * self.center_frequency * time_steps) +
-             16 * np.sin(2 * np.pi * 10 * mid_f2 * time_steps) +
-             24 * np.sin(2 * np.pi * end_freq * time_steps))
-
-        self.plot_signal(time_steps, y, self.ax1, title="Signal Sine Wave", xlabel="Time (s)", ylabel="Amplitude")
+        if sweep:
+            y = chirp(time_steps, f0=mid_f1, f1=end_freq, t1=(number_of_samples-1)*sample_time_interval, method='linear')
+            self.plot_signal(time_steps, y, self.ax1, title="Signal Frequency Sweep",
+                             xlabel="Time (s)", ylabel="Amplitude")
+        else:
+            #  sine waves combined
+            y = (1 * np.sin(2 * np.pi * start_freq * time_steps) +
+                 8 * np.sin(2 * np.pi  * mid_f1 * time_steps) +
+                 4 * np.sin(2 * np.pi * self.center_frequency * time_steps) +
+                 16 * np.sin(2 * np.pi * mid_f2 * time_steps) +
+                 24 * np.sin(2 * np.pi * end_freq * time_steps))
+            self.plot_signal(time_steps, y, self.ax1, title="Signal Sine Wave", xlabel="Time (s)", ylabel="Amplitude")
 
         # fft windows
 
@@ -73,8 +79,10 @@ class Signal():
         f_plot = freq_steps[0:int(number_of_samples/2+1)]
         x_mag_plot = 2 * x_mag[0:int(number_of_samples/2+1)]
         x_mag_plot[0] = x_mag_plot[0] / 2
+        q_span = Quantity(self.span, 'Hz')
+        q_rbw = Quantity(self.sample_rate/number_of_samples, 'Hz')
         self.plot_signal(f_plot, x_mag_plot, self.ax2,
-                         title="Signal Sine Wave Spectrum Analyzer",
+                         title="Spectrum Analyzer. Span = {0} | RBW = {1}".format(q_span, q_rbw),
                          xlabel="Frequency (Hz)", ylabel="Amplitude")
 
         # fft - apply kaiser window
@@ -83,7 +91,6 @@ class Signal():
         N = fft_size  # Number of samples
         fs = self.sample_rate # Sampling frequency
         t = np.arange(N) / fs
-        f = 10  # Frequency of the signal
 
         #  sine waves combined with fft size applied
         y_fft_sized = (1 * np.sin(2 * np.pi * start_freq * t) +
@@ -105,9 +112,10 @@ class Signal():
         freq = np.fft.fftshift(freq)
 
         # Plot the spectrum
-
-        self.plot_fft_window(freq, response, self.ax3,
-                             title="{0} Window FFT with FFT Size {1} points".format(window_type, fft_size),
+        q_rbw = Quantity(self.sample_rate/N, 'Hz')
+        self.plot_signal(freq, response, self.ax3,
+                             title="{0} Window FFT with FFT Size {1} points. RBW ~ {2}".
+                             format(window_type[:1].upper()+window_type[1:], fft_size, q_rbw),
                              xlabel="Frequency (Hz)", ylabel="Magnitude")
 
     def plot_signal(self, inteval, signal, ax, title, xlabel, ylabel):
@@ -121,24 +129,13 @@ class Signal():
         if 'Window' not in title:
             ax.set_xlim(0, (inteval[-1]))
         else:
-            ax.set_xlim(0, self.sample_rate / 26)
-        plt.tight_layout()
-
-    def plot_fft_window(self, inteval, signal, ax, title, xlabel, ylabel):
-        # create plot with labels and title
-        ax.plot(inteval, signal, ".-", lw=0.4, c='blue')
-        ax.set_title("Kaiser Window FFT with FFT Size 4096 points")
-        ax.set_xlabel("Frequency (Hz)")
-        ax.set_ylabel("Magnitude")
-        ax.minorticks_on()
-        ax.grid()
-        ax.set_xlim(0, self.sample_rate / 5)
+            ax.set_xlim(0, self.sample_rate / 16)
         plt.tight_layout()
 
 
 if __name__ == '__main__':
     sig = Signal()
-    sig.sine_wave(span=50e6, fft_size=4096, window_type=Windows.Kaiser)
+    (sig.waveform(span=100e6, fft_size=4096, window_type=Windows.Kaiser, sweep=False))
     plt.show()
 
 
